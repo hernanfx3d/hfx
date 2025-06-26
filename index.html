@@ -1,447 +1,415 @@
 <!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>CRM: Operadores de Apuestas en México</title>
+    <title>Collaborative Drawing App</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f1f5f9; /* slate-100 */
+            touch-action: none; /* Prevents default touch behaviors like scrolling */
         }
-        .progress-bar-container {
-            background-color: #e2e8f0; /* slate-200 */
-            border-radius: 9999px;
-            overflow: hidden;
+        #canvas {
+            border: 2px solid #e5e7eb; /* gray-200 */
+            border-radius: 0.5rem; /* rounded-lg */
+            cursor: crosshair;
         }
-        .progress-bar {
-            background-color: #2563eb; /* blue-600 */
+        .color-swatch {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.1s;
+        }
+        .color-swatch.active, .color-swatch:hover {
+            transform: scale(1.1);
+            border-color: #3b82f6; /* blue-500 */
+        }
+        .tool-btn {
+            transition: all 0.2s;
+        }
+        .tool-btn.active {
+            background-color: #3b82f6; /* blue-500 */
+            color: white;
+        }
+        #loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
             height: 100%;
-            transition: width 0.5s ease-in-out;
-        }
-        .contact-card {
-            background: white;
-            border-radius: 0.75rem;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.05);
-            transition: all 0.3s ease-in-out;
-            border-left: 5px solid #64748b; /* slate-500 for 'Pendiente' */
+            background-color: rgba(255, 255, 255, 0.8);
             display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 9999;
             flex-direction: column;
         }
-        .contact-card .card-content {
-            flex-grow: 1;
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border-left-color: #3b82f6;
+            animation: spin 1s ease infinite;
         }
-        .contact-card.contactado {
-            border-left-color: #16a34a; /* green-600 */
-            background-color: #f0fdf4; /* green-50 */
-        }
-        .custom-checkbox {
-            appearance: none;
-            background-color: #fff;
-            margin: 0;
-            font: inherit;
-            color: currentColor;
-            width: 1.15em;
-            height: 1.15em;
-            border: 0.15em solid currentColor;
-            border-radius: 0.25em;
-            transform: translateY(-0.075em);
-            display: grid;
-            place-content: center;
-            cursor: pointer;
-        }
-        .custom-checkbox::before {
-            content: "";
-            width: 0.65em;
-            height: 0.65em;
-            transform: scale(0);
-            transition: 120ms transform ease-in-out;
-            box-shadow: inset 1em 1em #2563eb;
-            transform-origin: bottom left;
-            clip-path: polygon(14% 44%, 0 65%, 50% 100%, 100% 16%, 80% 0%, 43% 62%);
-        }
-        .custom-checkbox:checked::before {
-            transform: scale(1);
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
         }
     </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
 </head>
-<body class="antialiased text-slate-800">
+<body class="bg-gray-50 flex flex-col items-center justify-center min-h-screen p-4">
 
-    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
-        
-        <header class="text-center mb-8">
-            <h1 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight">Dashboard de Contactos: Industria del Juego en México</h1>
-            <p class="mt-2 text-lg text-slate-600 max-w-3xl mx-auto">Una herramienta interactiva para gestionar y rastrear tu comunicación con operadores.</p>
-        </header>
+    <div id="loading-overlay">
+        <div class="spinner"></div>
+        <p class="mt-4 text-gray-600">Connecting to the canvas...</p>
+    </div>
 
-        <!-- Stats and Progress Section -->
-        <section class="mb-8 p-6 bg-white rounded-xl shadow-lg">
-            <h2 class="text-2xl font-bold mb-4 text-slate-800">Resumen de Progreso</h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div>
-                    <div class="text-4xl font-extrabold text-blue-600" id="total-contacts">0</div>
-                    <div class="text-sm font-medium text-slate-500">Contactos Totales</div>
-                </div>
-                <div>
-                    <div class="text-4xl font-extrabold text-green-600" id="contacted-count">0</div>
-                    <div class="text-sm font-medium text-slate-500">Contactados</div>
-                </div>
-                <div>
-                    <div class="text-4xl font-extrabold text-slate-600" id="pending-count">0</div>
-                    <div class="text-sm font-medium text-slate-500">Pendientes</div>
-                </div>
-            </div>
-            <div class="mt-6">
-                <div class="flex justify-between mb-1">
-                    <span class="text-base font-medium text-blue-700">Progreso de Contacto</span>
-                    <span class="text-sm font-medium text-blue-700" id="progress-percentage">0%</span>
-                </div>
-                <div class="progress-bar-container w-full h-4">
-                    <div id="progress-bar" class="progress-bar h-4 rounded-full"></div>
-                </div>
-            </div>
-        </section>
+    <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-3xl font-bold text-center text-gray-800 mb-2">Collaborative Drawing Board</h1>
+        <p class="text-center text-gray-500 mb-4">Draw with others in real-time. Share your User ID to invite them.</p>
 
-        <!-- Filters -->
-        <div class="mb-8 p-4 bg-white rounded-xl shadow-md grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
-            <div class="flex-grow">
-                <label for="filter-type" class="block text-sm font-medium text-slate-700">Filtrar por tipo:</label>
-                <select id="filter-type" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option value="all">Todos los Tipos</option>
-                    <option value="permisionario">Permisionarios</option>
-                    <option value="operador-segob">Operadores SEGOB</option>
-                    <option value="operador-internacional">Operadores Internacionales</option>
-                    <option value="casino-fisico">Casinos Físicos</option>
-                </select>
+        <!-- User Info and Controls -->
+        <div class="bg-white p-4 rounded-lg shadow-md mb-4 flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-4">
+                <div class="flex items-center gap-2">
+                    <label for="color-picker" class="font-medium text-gray-700">Color:</label>
+                    <div id="color-palette" class="flex items-center gap-2">
+                        <div class="color-swatch active" style="background-color: #EF4444;" data-color="#EF4444"></div>
+                        <div class="color-swatch" style="background-color: #F97316;" data-color="#F97316"></div>
+                        <div class="color-swatch" style="background-color: #EAB308;" data-color="#EAB308"></div>
+                        <div class="color-swatch" style="background-color: #22C55E;" data-color="#22C55E"></div>
+                        <div class="color-swatch" style="background-color: #3B82F6;" data-color="#3B82F6"></div>
+                        <div class="color-swatch" style="background-color: #8B5CF6;" data-color="#8B5CF6"></div>
+                        <div class="color-swatch" style="background-color: #1F2937;" data-color="#1F2937"></div>
+                    </div>
+                </div>
+                 <div class="flex items-center gap-2">
+                    <label for="brush-size" class="font-medium text-gray-700">Size:</label>
+                    <input type="range" id="brush-size" min="1" max="50" value="5" class="w-24">
+                </div>
             </div>
-            <div class="flex-grow">
-                <label for="filter-status" class="block text-sm font-medium text-slate-700">Filtrar por estado:</label>
-                <select id="filter-status" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option value="all">Todos los Estados</option>
-                    <option value="pendiente">Pendiente</option>
-                    <option value="contactado">Contactado</option>
-                </select>
-            </div>
-            <div class="flex-grow">
-                <label for="filter-location" class="block text-sm font-medium text-slate-700">Filtrar por ubicación:</label>
-                <select id="filter-location" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-slate-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md">
-                    <option value="all">Todas las Ubicaciones</option>
-                </select>
+            <div class="flex items-center gap-2">
+                <button id="clear-canvas" class="tool-btn bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded-lg">Clear All</button>
             </div>
         </div>
 
-        <!-- Contact Cards Grid -->
-        <main id="contacts-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            <!-- JS will inject cards here -->
-        </main>
+        <!-- Canvas -->
+        <canvas id="canvas" class="bg-white rounded-lg shadow-md"></canvas>
+        
+        <!-- User ID display -->
+        <div class="mt-4 p-3 bg-blue-100 border border-blue-200 rounded-lg text-center">
+            <span class="font-medium text-blue-800">Your User ID:</span>
+            <span id="userId" class="font-mono text-blue-700 break-all">Loading...</span>
+        </div>
     </div>
 
+    <!-- Firebase -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, setPersistence, inMemoryPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, setDoc, updateDoc, collection, serverTimestamp, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // =================================================================================
-        // PASO 1: Reemplaza este objeto con tus propias credenciales de Firebase.
-        // Ve a tu proyecto de Firebase -> Configuración del proyecto (engranaje) -> General
-        // En la sección "Tus apps", selecciona o crea una app web (<>).
-        // Copia el objeto de configuración (firebaseConfig) y pégalo aquí.
-        // =================================================================================
-        const firebaseConfig = {
-          // Descomenta y rellena estas líneas:
-          // apiKey: "AIza...",
-          // authDomain: "...",
-          // projectId: "...",
-          // storageBucket: "...",
-          // messagingSenderId: "...",
-          // appId: "..."
-        };
-        // =================================================================================
+        // --- Firebase Configuration ---
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
+        // --- Firebase Globals ---
+        let app, db, auth;
+        let userId;
+        let drawingDataUnsubscribe = null; // To hold the listener unsub function
 
-        // --- DATA ---
-        const allContacts = [
-            // Permisionarios from PERMISIONARIOS-hecho.docx
-            { id: "perm_0", type: 'permisionario', name: "Espectáculos Deportivos Frontón México S.A. de C.V.", location: "Ciudad de México", email: "contacto@frontonmexico.com.mx", website: "frontonmexico.com.mx", phone: "+52 55 5128 3408" },
-            { id: "perm_00", type: 'permisionario', name: "Hipódromo de Agua Caliente S.A. de C.V.", location: "Baja California", email: "contacto@caliente.com.mx", website: "grupocaliente.com.mx", phone: "(664) 647 4770" },
-            { id: "perm_1", type: 'permisionario', name: "PETOLOF S.A. de C.V.", location: "Nuevo León", email: "N/A", website: "N/A", phone: "N/A" },
-            { id: "perm_2", type: 'permisionario', name: "Cesta-Punta Deportes S.A. de C.V.", location: "Chihuahua", email: "N/A", website: "cestapunta.com", phone: "N/A" },
-            { id: "perm_3", type: 'permisionario', name: "Libros Foráneos S.A. de C.V.", location: "Puebla", email: "plazadorada.operaciones@codere.com", website: "codere.mx", phone: "(222) 225 7102" },
-            { id: "perm_6", type: 'permisionario', name: "Espectáculos Deportivos de Cancún S.A. de C.V.", location: "Quintana Roo", email: "N/A", website: "N/A", phone: "N/A" },
-            { id: "perm_7", type: 'permisionario', name: "Atracciones y Emociones Vallarta S.A. de C.V.", location: "Quintana Roo", email: "litigio@notaria39.com.mx", website: "strendus.com.mx", phone: "(044) 998 301 8041" },
-            { id: "perm_11", type: 'permisionario', name: "Operadora Cantabria S.A. de C.V.", location: "Ciudad de México", email: "amatzin58@gmail.com", website: "N/A", phone: "(722) 212 5526" },
-            { id: "perm_12", type: 'permisionario', name: "Grupo Océano Haman S.A. de C.V.", location: "Ciudad de México", email: "jose.ortega@caliente.com.mx", website: "calientecasino.com.mx", phone: "(55) 5245 8291" },
-            { id: "perm_16", type: 'permisionario', name: "Comercial de Juegos de la Frontera S.A. de C.V.", location: "Estado de México", email: "administracion.metepec@bigbola.com", website: "bigbola.com", phone: "(722) 232 5552" },
-            { id: "perm_17", type: 'permisionario', name: "Mio Games S.A. de C.V.", location: "Ciudad de México", email: "rodolfo.hernandez@codere.com", website: "codere.mx", phone: "(55) 5588 0509" },
-            { id: "perm_18", type: 'permisionario', name: "Juega y Juega S.A. de C.V.", location: "Tamaulipas", email: "san-dila@gmail.com", website: "juegayjuega.com.mx", phone: "N/A" },
-            { id: "perm_21", type: 'permisionario', name: "Apuestas Internacionales S.A. de C.V.", location: "Veracruz", email: "N/A", website: "playcity.com", phone: "N/A" },
-            { id: "perm_22", type: 'permisionario', name: "El Palacio de los Números S.A. de C.V.", location: "Ciudad de México", email: "contacto@pdn.com.mx", website: "pdn.com.mx", phone: "(55) 5564 8709" },
-            { id: "perm_23", type: 'permisionario', name: "Juegos y Sorteos de Jalisco S.A. de C.V.", location: "Jalisco", email: "N/A", website: "jsjgaming.com.mx", phone: "N/A" },
-            
-            // Operadores SEGOB from EMPRESAS-TABLAhecha.docx & MEXICO-SEGOBasesinOper.docx
-            { id: "op_1xbet", type: 'operador-segob', name: "1xBet", location: "Online", email: "support@1xbet-team.com", website: "1xbet.com.mx", phone: "+52 800 461 0406" },
-            { id: "op_bet365", type: 'operador-segob', name: "Bet365", location: "Online", email: "ayuda@bet365.com", website: "bet365.mx", phone: "+52 55 5720 9165" },
-            { id: "op_codere", type: 'operador-segob', name: "Codere", location: "Ciudad de México", email: "apuestas@codere.mx", website: "codere.mx", phone: "+52 55 5201 7800" },
-            { id: "op_winpot", type: 'operador-segob', name: "Winpot", location: "Online", email: "soporte@winpot.mx", website: "winpot.mx", phone: "N/A" },
-            { id: "op_playdoit", type: 'operador-segob', name: "Playdoit", location: "Online", email: "soporte@playdoit.mx", website: "playdoit.mx", phone: "N/A" },
-            { id: "op_campobet", type: 'operador-segob', name: "Campobet", location: "Online", email: "support@campobet.com", website: "campobet.com", phone: "N/A" },
-            { id: "op_10bet", type: 'operador-segob', name: "10Bet", location: "Online", email: "soporte@10bet.mx", website: "10bet.mx", phone: "+52 55 6943 7023" },
-            { id: "op_sportiumbet", type: 'operador-segob', name: "Sportiumbet", location: "Online", email: "contacto@sportiumbet.mx", website: "sportiumbet.mx", phone: "N/A" },
-            { id: "op_novibet", type: 'operador-segob', name: "Novibet", location: "Online", email: "support@novibet.com", website: "novibet.mx", phone: "N/A" },
-            { id: "op_betsson", type: 'operador-segob', name: "Betsson", location: "Ciudad de México", email: "soporte@betsson.mx", website: "betsson.mx", phone: "N/A" },
-            { id: "op_instabet", type: 'operador-segob', name: "Instabet", location: "Online", email: "soporte@instabet.mx", website: "instabet.mx", phone: "N/A" },
-            { id: "op_strendus", type: 'operador-segob', name: "Strendus", location: "Online", email: "ayuda@strendus.mx", website: "strendus.mx", phone: "+52 800 123 6789" },
-            { id: "op_playcity", type: 'operador-segob', name: "PlayCity", location: "Múltiples", email: "contacto@playcity.com.mx", website: "playcity.com", phone: "+52 55 5678 3700" },
-            { id: "op_mexplay", type: 'operador-segob', name: "Mexplay", location: "Online", email: "soporte@mexplay.com.mx", website: "mexplay.com.mx", phone: "N/A" },
-            { id: "op_betway", type: 'operador-segob', name: "Betway", location: "Ciudad de México", email: "contacto@betway.mx", website: "betway.mx", phone: "800 9 530 172" },
-            { id: "op_diamante", type: 'operador-segob', name: "Diamante Casino", location: "Estado de México", email: "produccion@diamantecasino.com.mx", website: "diamantecasino.com.mx", phone: "+52 55 2661 3265" },
-            { id: "op_winner", type: 'operador-segob', name: "Winner.mx", location: "Online", email: "soporte@winner.mx", website: "winner.mx", phone: "N/A" },
-            { id: "op_mostbet", type: 'operador-segob', name: "MostBet", location: "Online", email: "support@mostbet.com", website: "mostbet.com.mx", phone: "N/A" },
-            { id: "op_betmexico", type: 'operador-segob', name: "BetMexico", location: "Nuevo León", email: "contacto@betmexico.mx", website: "betmexico.mx", phone: "+52 81 1982 3524" },
-            { id: "op_888", type: 'operador-segob', name: "888sport", location: "Online", email: "support@888.com", website: "888sport.com.mx", phone: "+44 1273 750 070" },
-            { id: "op_betmaster", type: 'operador-segob', name: "Betmaster", location: "Online", email: "soporte@betmaster.com.mx", website: "betmaster.com.mx", phone: "N/A" },
-            { id: "op_bbrbet", type: 'operador-segob', name: "BBRBET Casino", location: "Online", email: "support@brbbet.com", website: "brbbet.com.mx", phone: "+52 55 8765 4321" },
-            { id: "op_playuzu", type: 'operador-segob', name: "Playuzu Casino", location: "Internacional", email: "suporte@playuzu.mx", website: "playuzu.mx", phone: "N/A" },
-            { id: "op_spincasino", type: 'operador-segob', name: "SpinCasino", location: "Online", email: "support@spincasino.com", website: "spincasino.com", phone: "N/A" },
-            { id: "op_pinup", type: 'operador-segob', name: "Pin-UP Casino", location: "Online", email: "support@pin-up.support", website: "pin-up-casino.com.mx", phone: "+357 22 008 792" },
-            { id: "op_twin", type: 'operador-segob', name: "Twin", location: "Online", email: "soporte@twin.mx", website: "twin.mx", phone: "N/A" },
-            { id: "op_aconcagua", type: 'operador-segob', name: "Aconcagua Poker Casino", location: "Online", email: "info@aconcaguapoker.com", website: "aconcaguapoker.com", phone: "N/A" },
-            { id: "op_ijuego", type: 'operador-segob', name: "iJuego Casino", location: "Online", email: "soporte@ijuego.mx", website: "ijuego.mx", phone: "N/A" },
+        // --- UI Elements ---
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const colorPalette = document.getElementById('color-palette');
+        const brushSizeSlider = document.getElementById('brush-size');
+        const clearButton = document.getElementById('clear-canvas');
+        const userIdElement = document.getElementById('userId');
+        const loadingOverlay = document.getElementById('loading-overlay');
 
-            // Operadores Internacionales
-            { id: "op_int_20bet", type: 'operador-internacional', name: "20Bet", location: "Internacional", email: "support@20bet.com", website: "20-bet.mx", phone: "N/A" },
-            { id: "op_int_national", type: 'operador-internacional', name: "National Casino", location: "Internacional", email: "support@nationalcasino.com", website: "nationalcasino.com", phone: "N/A" },
-            { id: "op_int_bodog", type: 'operador-internacional', name: "Bodog", location: "Internacional", email: "service@bodog.com", website: "bodog.com", phone: "+1-877-263-6422" },
-            { id: "op_int_jackpotcity", type: 'operador-internacional', name: "Jackpot City", location: "Internacional", email: "support@jackpotcity.com", website: "jackpotcity.mx", phone: "+52 55 5147 2100" },
-            { id: "op_int_22bet", type: 'operador-internacional', name: "22Bet", location: "Internacional", email: "support-mx@22bet.com", website: "22bet.mx", phone: "+52 55 2600 6122" },
-            { id: "op_int_melbet", type: 'operador-internacional', name: "Melbet", location: "Internacional", email: "support@melbet.com", website: "melbet.mx", phone: "N/A" },
-            { id: "op_int_luckia", type: 'operador-internacional', name: "Luckia", location: "Internacional", email: "clientes@mx.luckia.com", website: "luckia.mx", phone: "+52 800 953 2014" },
-            { id: "op_int_dafabet", type: 'operador-internacional', name: "Dafabet", location: "Internacional", email: "ensupport@dafabet.com", website: "dafabet.com", phone: "+63 917 800 3652" },
-            { id: "op_int_betmotion", type: 'operador-internacional', name: "Betmotion", location: "Internacional", email: "soporte@betmotion.com", website: "betmotion.com", phone: "+52 55 8526 1957" },
-            { id: "op_int_ganabet", type: 'operador-internacional', name: "Ganabet", location: "Online", email: "soporte@ganabet.com.mx", website: "ganabet.com.mx", phone: "N/A" },
-            { id: "op_int_marathonbet", type: 'operador-internacional', name: "Marathonbet", location: "Online", email: "soporte@marathonbet.com.mx", website: "marathonbet.mx", phone: "N/A" },
-            { id: "op_int_pinnacle", type: 'operador-internacional', name: "Pinnacle", location: "Internacional", email: "N/A", website: "pinnacle.com", phone: "N/A" },
-            { id: "op_int_williamhill", type: 'operador-internacional', name: "William Hill", location: "Internacional", email: "support-mx@willhill.com", website: "williamhill.mx", phone: "+52 55 4160 2300" },
+        // --- Drawing State ---
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let brushColor = '#EF4444';
+        let brushSize = 5;
+        let paths = {}; // Store paths being drawn by different users {userId: [{x,y},...]}
 
-            // Casinos Fisicos from CasinoisNotable.docx
-            { id: "cf_caliente_hipodromo", type: 'casino-fisico', name: "Caliente Casino Hipódromo", location: "Baja California", email: "soporte@caliente.mx", website: "calientecasino.com.mx", phone: "(664) 647 4770" },
-            { id: "cf_caliente_plaza", type: 'casino-fisico', name: "Caliente Plaza Casino", location: "Baja California", email: "N/A", website: "calientecasino.com.mx", phone: "+52 664 624 2700" },
-            { id: "cf_emotion_zapopan", type: 'casino-fisico', name: "Emotion Casino (Plaza del Sol)", location: "Jalisco", email: "N/A", website: "cirsa.mx", phone: "+52 33 3647 2871" },
-            { id: "cf_jubilee", type: 'casino-fisico', name: "Jubilee Casino", location: "Nuevo León", email: "N/A", website: "jubileecasino.mx", phone: "800 582 4533" },
-            { id: "cf_royal_yak", type: 'casino-fisico', name: "Casino Royal Yak (CdMx)", location: "Ciudad de México", email: "N/A", website: "salas.codere.mx/yak", phone: "+52 55 5387 0600" },
-        ];
+        // --- Functions ---
 
-        // --- FIREBASE SETUP ---
-        const appId = firebaseConfig.projectId || 'crm-operadores-mexico-default';
-        let db;
-
+        /**
+         * Initialize Firebase App and services.
+         * Handles authentication and sets up Firestore listeners.
+         */
         async function initializeFirebase() {
-            if (!firebaseConfig || !firebaseConfig.apiKey) {
-                console.warn("Firebase config not provided. Running in offline mode. Changes will not be saved.");
-                const header = document.querySelector('header');
-                if (header) {
-                    header.insertAdjacentHTML('afterend', `
-                        <div class="container mx-auto mb-6">
-                            <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 rounded-r-lg" role="alert">
-                                <p class="font-bold">Modo sin conexión</p>
-                                <p>No se han proporcionado credenciales de Firebase. La aplicación funcionará, pero el estado de los contactos no se guardará.</p>
-                            </div>
-                        </div>
-                    `);
+            try {
+                if (!Object.keys(firebaseConfig).length) {
+                    console.error("Firebase config is not available.");
+                    loadingOverlay.innerHTML = '<p class="text-red-500">Error: Firebase configuration is missing.</p>';
+                    return;
                 }
                 
-                contactDataWithStatus = allContacts.map(c => ({...c, status: 'pendiente'}));
-                populateLocationFilter();
-                renderCards();
-                updateStats(); 
-                return;
-            }
-            try {
-                const app = initializeApp(firebaseConfig);
+                // Initialize Firebase App
+                app = initializeApp(firebaseConfig);
                 db = getFirestore(app);
-                const auth = getAuth(app);
-                await signInAnonymously(auth);
-                listenForStatusChanges();
+                auth = getAuth(app); 
+
+                // Use in-memory persistence to avoid issues in some browser environments
+                await setPersistence(auth, inMemoryPersistence);
+
+                console.log("Firebase Initialized. Setting up auth listener...");
+                
+                // Listen for authentication state changes
+                onAuthStateChanged(auth, async (user) => {
+                    if (user) {
+                        // User is signed in.
+                        userId = user.uid;
+                        userIdElement.textContent = userId;
+                        console.log("User authenticated with ID:", userId);
+                        
+                        // Setup the real-time listener for drawing data
+                        setupDrawingListener();
+
+                    } else {
+                        // User is signed out.
+                        console.log("User is not authenticated. Signing in...");
+                        // If no user, try to sign in
+                        if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                            await signInWithCustomToken(auth, __initial_auth_token);
+                        } else {
+                            await signInAnonymously(auth);
+                        }
+                    }
+                });
+
             } catch (error) {
                 console.error("Firebase initialization failed:", error);
-                 document.getElementById('contacts-grid').innerHTML = `
-                    <div class="col-span-full text-center bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg relative" role="alert">
-                      <strong class="font-bold">Error de Firebase:</strong>
-                      <span class="block sm:inline">No se pudo inicializar la base de datos. Verifica la configuración y las reglas de seguridad.</span>
-                    </div>
-                `;
+                loadingOverlay.innerHTML = `<p class="text-red-500 text-center p-4">Could not connect to the canvas service. <br>Details: ${error.message}</p>`;
             }
         }
-        
-        // --- STATE & RENDERING ---
-        let contactDataWithStatus = [];
 
-        function populateLocationFilter() {
-            const locationFilter = document.getElementById('filter-location');
-            if (locationFilter.options.length > 1) return; // Populate only once
-            const locations = [...new Set(allContacts.map(c => c.location))].sort();
-            locations.forEach(location => {
-                const option = document.createElement('option');
-                option.value = location;
-                option.textContent = location;
-                locationFilter.appendChild(option);
-            });
-        }
-
-        function renderCards() {
-            const grid = document.getElementById('contacts-grid');
-            grid.innerHTML = '';
-
-            const typeFilter = document.getElementById('filter-type').value;
-            const statusFilter = document.getElementById('filter-status').value;
-            const locationFilter = document.getElementById('filter-location').value;
+        /**
+         * Sets up the real-time listener on the Firestore document.
+         */
+        function setupDrawingListener() {
+            // FIX: Corrected Firestore path to have an even number of segments.
+            // Path: /artifacts/{appId}/public/data/drawing/state
+            const docRef = doc(db, "artifacts", appId, "public", "data", "drawing", "state");
             
-            const filteredData = contactDataWithStatus.filter(contact => {
-                const typeMatch = typeFilter === 'all' || contact.type === typeFilter;
-                const statusMatch = statusFilter === 'all' || contact.status === statusFilter;
-                const locationMatch = locationFilter === 'all' || contact.location === locationFilter;
-                return typeMatch && statusMatch && locationMatch;
-            });
-
-            if (filteredData.length === 0) {
-                 grid.innerHTML = `<p class="text-slate-500 col-span-full text-center py-10">No hay contactos que coincidan con los filtros seleccionados.</p>`;
+            // Unsubscribe from any previous listener
+            if (drawingDataUnsubscribe) {
+                drawingDataUnsubscribe();
             }
 
-            filteredData.forEach(contact => {
-                const isContacted = contact.status === 'contactado';
-                const card = document.createElement('div');
-                card.className = `contact-card ${isContacted ? 'contactado' : ''}`;
-                card.innerHTML = `
-                    <div class="p-4 card-content">
-                        <div class="flex items-start justify-between">
-                            <div>
-                                <h3 class="font-bold text-lg text-slate-800">${contact.name}</h3>
-                                <p class="text-sm text-slate-500"><i class="fas fa-map-marker-alt fa-fw mr-1"></i>${contact.location}</p>
-                            </div>
-                            <div class="flex items-center gap-2 text-sm text-slate-600">
-                                <label for="check-${contact.id}" class="sr-only">Marcar como contactado</label>
-                                <input type="checkbox" id="check-${contact.id}" class="custom-checkbox" ${isContacted ? 'checked' : ''} data-id="${contact.id}">
-                            </div>
-                        </div>
-                        <div class="mt-4 pt-4 border-t border-slate-200 space-y-2 text-sm">
-                            <div class="flex items-center">
-                                <i class="fas fa-envelope fa-fw mr-2 text-slate-400"></i>
-                                <span class="text-slate-700 truncate" title="${contact.email}">${contact.email}</span>
-                                <button class="copy-email-btn ml-auto text-blue-600 hover:text-blue-800 flex-shrink-0" data-email="${contact.email}" ${contact.email === 'N/A' ? 'disabled style="opacity:0.5; cursor:not-allowed;"' : ''}><i class="fas fa-copy"></i></button>
-                            </div>
-                            <div class="flex items-center">
-                                <i class="fas fa-globe fa-fw mr-2 text-slate-400"></i>
-                                <a href="https://${contact.website}" target="_blank" class="text-blue-600 hover:underline truncate">${contact.website}</a>
-                            </div>
-                            <div class="flex items-center">
-                                <i class="fas fa-phone fa-fw mr-2 text-slate-400"></i>
-                                <span class="text-slate-700">${contact.phone}</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                grid.appendChild(card);
-            });
-            addEventListeners();
-            updateStats();
-        }
-        
-        function updateStats() {
-            const total = contactDataWithStatus.length;
-            const contacted = contactDataWithStatus.filter(c => c.status === 'contactado').length;
-            const pending = total - contacted;
-            const percentage = total > 0 ? Math.round((contacted / total) * 100) : 0;
-
-            document.getElementById('total-contacts').textContent = total;
-            document.getElementById('contacted-count').textContent = contacted;
-            document.getElementById('pending-count').textContent = pending;
-            document.getElementById('progress-percentage').textContent = `${percentage}%`;
-            document.getElementById('progress-bar').style.width = `${percentage}%`;
-        }
-
-        function addEventListeners() {
-            document.querySelectorAll('.custom-checkbox').forEach(checkbox => {
-                checkbox.addEventListener('change', handleStatusChange);
-            });
-            document.querySelectorAll('.copy-email-btn').forEach(button => {
-                button.addEventListener('click', handleCopyEmail);
-            });
-        }
-
-        async function handleStatusChange(event) {
-            const contactId = event.target.dataset.id;
-            const newStatus = event.target.checked ? 'contactado' : 'pendiente';
-
-            if (!db) {
-                console.warn("Offline mode: Status change is local and will be lost on reload.");
-                const contact = contactDataWithStatus.find(c => c.id === contactId);
-                if (contact) {
-                    contact.status = newStatus;
+            drawingDataUnsubscribe = onSnapshot(docRef, (docSnap) => {
+                loadingOverlay.style.display = 'none'; // Hide loading once we get data
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    // Deserialize the drawing data if it's a string
+                    const drawingData = (typeof data.drawing === 'string') ? JSON.parse(data.drawing) : data.drawing;
+                    if (drawingData) {
+                       paths = drawingData;
+                    } else {
+                       paths = {}; // Reset if data is null/undefined
+                    }
+                } else {
+                    console.log("No drawing data found, starting fresh.");
+                    paths = {}; // Document doesn't exist, start with empty paths
                 }
-                renderCards();
-                return;
-            }
-
-            const docRef = doc(db, `artifacts/${appId}/public/data/operator_statuses`, contactId);
-            try {
-                await setDoc(docRef, { status: newStatus });
-            } catch (error) {
-                console.error("Error updating status in Firestore:", error);
-                event.target.checked = !event.target.checked;
-            }
-        }
-
-        function handleCopyEmail(event) {
-            const email = event.currentTarget.dataset.email;
-            if (email === 'N/A') return;
-            const textarea = document.createElement('textarea');
-            textarea.value = email;
-            document.body.appendChild(textarea);
-            textarea.select();
-            try {
-                document.execCommand('copy');
-                const icon = event.currentTarget.querySelector('i');
-                icon.classList.remove('fa-copy');
-                icon.classList.add('fa-check');
-                setTimeout(() => {
-                    icon.classList.remove('fa-check');
-                    icon.classList.add('fa-copy');
-                }, 1500);
-            } catch (err) {
-                console.error('Failed to copy email: ', err);
-            }
-            document.body.removeChild(textarea);
-        }
-        
-        document.getElementById('filter-type').addEventListener('change', renderCards);
-        document.getElementById('filter-status').addEventListener('change', renderCards);
-        document.getElementById('filter-location').addEventListener('change', renderCards);
-        
-        function listenForStatusChanges() {
-            const statusesCol = collection(db, `artifacts/${appId}/public/data/operator_statuses`);
-            onSnapshot(statusesCol, (snapshot) => {
-                const statuses = {};
-                snapshot.forEach(doc => {
-                    statuses[doc.id] = doc.data().status;
-                });
-                contactDataWithStatus = allContacts.map(contact => ({
-                    ...contact,
-                    status: statuses[contact.id] || 'pendiente'
-                }));
-                populateLocationFilter();
-                renderCards();
+                redrawCanvas();
             }, (error) => {
-                console.error("Error listening to status changes: ", error);
-                contactDataWithStatus = allContacts.map(c => ({...c, status: 'pendiente'}));
-                populateLocationFilter();
-                renderCards();
+                console.error("Error listening to drawing data:", error);
+                loadingOverlay.innerHTML = `<p class="text-red-500">Error listening for updates. Try refreshing.</p>`;
+                loadingOverlay.style.display = 'flex';
             });
         }
         
-        initializeFirebase();
+        /**
+         * Resizes the canvas to fit its container, preserving the drawing.
+         */
+        function resizeCanvas() {
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const parent = canvas.parentElement;
+            canvas.width = parent.clientWidth;
+            canvas.height = window.innerHeight * 0.6; // 60% of viewport height
+            ctx.putImageData(imageData, 0, 0);
+            redrawCanvas(); // Redraw everything based on paths data
+        }
+
+        /**
+         * Redraws the entire canvas from the 'paths' object.
+         */
+        function redrawCanvas() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height); // Clear the canvas
+            Object.values(paths).forEach(pathData => {
+                 if (!pathData || !Array.isArray(pathData.points) || pathData.points.length < 2) return;
+                 
+                 ctx.strokeStyle = pathData.color;
+                 ctx.lineWidth = pathData.size;
+                 ctx.lineJoin = 'round';
+                 ctx.lineCap = 'round';
+
+                 ctx.beginPath();
+                 ctx.moveTo(pathData.points[0].x, pathData.points[0].y);
+                 for (let i = 1; i < pathData.points.length; i++) {
+                     ctx.lineTo(pathData.points[i].x, pathData.points[i].y);
+                 }
+                 ctx.stroke();
+            });
+        }
+
+        /**
+         * Draws a line on the local canvas.
+         */
+        function draw(e) {
+            if (!isDrawing) return;
+            
+            const currentPos = getMousePos(e);
+
+            if (!paths[userId] || !Array.isArray(paths[userId].points)) {
+                 paths[userId] = {
+                    points: [],
+                    color: brushColor,
+                    size: brushSize
+                 };
+            }
+            
+            // Add point to the current user's path
+            paths[userId].points.push(currentPos);
+            
+            // Draw the latest segment locally for responsiveness
+            ctx.strokeStyle = brushColor;
+            ctx.lineWidth = brushSize;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.beginPath();
+            ctx.moveTo(lastX, lastY);
+            ctx.lineTo(currentPos.x, currentPos.y);
+            ctx.stroke();
+
+            [lastX, lastY] = [currentPos.x, currentPos.y];
+        }
+
+        /**
+         * Get mouse/touch position relative to the canvas.
+         */
+        function getMousePos(e) {
+            const rect = canvas.getBoundingClientRect();
+            // Handle both touch and mouse events
+            const clientX = e.clientX || e.touches[0].clientX;
+            const clientY = e.clientY || e.touches[0].clientY;
+            return {
+                x: clientX - rect.left,
+                y: clientY - rect.top
+            };
+        }
+        
+        /**
+         * Persists the current state of the drawing to Firestore.
+         * To avoid high write costs, this should be called when drawing stops.
+         */
+        async function updateFirestoreDrawing() {
+            if (!userId) return;
+            // FIX: Corrected Firestore path
+            const docRef = doc(db, "artifacts", appId, "public", "data", "drawing", "state");
+             try {
+                // Serialize paths object to a JSON string to avoid Firestore nested array issues.
+                const serializedDrawing = JSON.stringify(paths);
+                await setDoc(docRef, { drawing: serializedDrawing, updatedAt: serverTimestamp() }, { merge: true });
+            } catch (error) {
+                console.error("Error updating Firestore:", error);
+            }
+        }
+        
+        /**
+         * Clears the drawing data in Firestore.
+         */
+        async function clearFirestoreDrawing() {
+             // FIX: Corrected Firestore path
+             const docRef = doc(db, "artifacts", appId, "public", "data", "drawing", "state");
+             try {
+                // Set the drawing field to an empty object string
+                await setDoc(docRef, { drawing: JSON.stringify({}), updatedAt: serverTimestamp() });
+                paths = {}; // Clear local paths
+                redrawCanvas(); // Clear local canvas
+            } catch (error) {
+                console.error("Error clearing Firestore document:", error);
+            }
+        }
+
+
+        // --- Event Listeners ---
+
+        // Start drawing
+        const startDrawing = (e) => {
+            isDrawing = true;
+            const pos = getMousePos(e);
+            [lastX, lastY] = [pos.x, pos.y];
+            
+            // Start a new path for this user
+            paths[userId] = {
+                points: [{x: lastX, y: lastY}],
+                color: brushColor,
+                size: brushSize
+            };
+        };
+
+        // Stop drawing and update Firestore
+        const stopDrawing = () => {
+            if (isDrawing) {
+                isDrawing = false;
+                updateFirestoreDrawing();
+            }
+        };
+
+        // Mouse events
+        canvas.addEventListener('mousedown', startDrawing);
+        canvas.addEventListener('mousemove', draw);
+        canvas.addEventListener('mouseup', stopDrawing);
+        canvas.addEventListener('mouseout', stopDrawing); // Stop if mouse leaves canvas
+
+        // Touch events
+        canvas.addEventListener('touchstart', (e) => { e.preventDefault(); startDrawing(e); }, { passive: false });
+        canvas.addEventListener('touchmove', (e) => { e.preventDefault(); draw(e); }, { passive: false });
+        canvas.addEventListener('touchend', stopDrawing);
+
+        // Tool controls
+        colorPalette.addEventListener('click', (e) => {
+            if (e.target.classList.contains('color-swatch')) {
+                brushColor = e.target.dataset.color;
+                // Update active state
+                document.querySelectorAll('.color-swatch').forEach(swatch => swatch.classList.remove('active'));
+                e.target.classList.add('active');
+            }
+        });
+
+        brushSizeSlider.addEventListener('input', (e) => {
+            brushSize = e.target.value;
+        });
+
+        clearButton.addEventListener('click', () => {
+            // Add a confirmation dialog in a real app
+            if (confirm("Are you sure you want to clear the canvas for everyone?")) {
+                clearFirestoreDrawing();
+            }
+        });
+        
+        // Window resize
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Initial Setup ---
+        window.onload = () => {
+            initializeFirebase();
+            resizeCanvas();
+        };
+
     </script>
 </body>
 </html>
